@@ -39,19 +39,26 @@ impl Component for Model {
                         ConsoleService::log("Data updated");
                         self.last_entry = s
                     }
-                    Err(e) => {}
+                    Err(e) => {
+                        ConsoleService::log("Data ERROR");
+                    }
                 }
                 true
             }
             Msg::Connect => {
-                let on_data = self.link.callback(|Json(data)| Msg::Data(data));
+                let on_data = self.link.callback(|data| Msg::Data(data));
                 let on_notify = self.link.callback(|input| {
                     ConsoleService::log(&format!("Notification: {:?}", input));
                     // TODO: Handle notification
                     Msg::Ignore
                 });
                 if self.socket.is_none() {
-                    let task = WebSocketService::connect_text("wss://websocket-integration-drogue-dev.apps.wonderful.iot-playground.org/drogue-public-temperature", on_data, on_notify);
+                    let task = WebSocketService::connect_text(
+//                        "ws://localhost:8080/chat/me",
+                        "wss://websocket-integration-drogue-dev.apps.wonderful.iot-playground.org/drogue-public-temperature",
+                        on_data,
+                        on_notify,
+                    );
 
                     ConsoleService::log("Task created");
                     self.socket.replace(task.unwrap());
