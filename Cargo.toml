@@ -9,3 +9,6 @@ edition = "2018"
 yew = "0.18"
 web-sys = "0.3.52"
 anyhow = "1.0"
+
+num-traits = "0.2"
+serde_json = "1.0.66"

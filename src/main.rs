@@ -1,9 +1,14 @@
+mod moving_avg;
+
 use anyhow::Error;
 use yew::services::{
     websocket::{WebSocketService, WebSocketTask},
     ConsoleService,
 };
-use yew::{format::Json, prelude::*};
+use yew::{prelude::*};
+use serde_json::Value;
+
+use crate::moving_avg::MovingAverage;
 
 enum Msg {
     Connect,
@@ -15,7 +20,9 @@ struct Model {
     // It can be used to send messages to the component
     link: ComponentLink<Self>,
     socket: Option<WebSocketTask>,
-    last_entry: String,
+    temperature_values: MovingAverage<f64>,
+    average :f64,
+    trend: String,
 }
 
 impl Component for Model {
@@ -26,7 +33,9 @@ impl Component for Model {
         Self {
             link,
             socket: None,
-            last_entry: String::from("No data"),
+            temperature_values: MovingAverage::new(5),
+            average: 0.0,
+            trend: String::from("No data"),
         }
     }
 
@@ -37,10 +46,13 @@ impl Component for Model {
                 match data {
                     Ok(s) => {
                         ConsoleService::log("Data updated");
-                        self.last_entry = s
+                        let json: Value = serde_json::from_str(s.as_str()).unwrap();
+
+                        let temp = json["data"]["temp"].as_f64().unwrap();
+                        self.update_data(temp);
                     }
                     Err(e) => {
-                        ConsoleService::log("Data ERROR");
+                        ConsoleService::log(format!("Data ERROR: {}", e).as_str());
                     }
                 }
                 true
@@ -55,9 +67,9 @@ impl Component for Model {
                 if self.socket.is_none() {
                     let task = WebSocketService::connect_text(
 //                        "ws://localhost:8080/chat/me",
-                        "wss://websocket-integration-drogue-dev.apps.wonderful.iot-playground.org/drogue-public-temperature",
-                        on_data,
-                        on_notify,
+"wss://websocket-integration-drogue-dev.apps.wonderful.iot-playground.org/drogue-public-temperature",
+on_data,
+on_notify,
                     );
 
                     ConsoleService::log("Task created");
@@ -79,9 +91,26 @@ impl Component for Model {
         html! {
             <div>
                 <button onclick=self.link.callback(|_| Msg::Connect)>{ "Connect" }</button>
-                <p>{ self.last_entry.clone() }</p>
+                <p>{"Last received value: "}{ self.temperature_values.last() }</p>
+                <p>{"Last 5 values average: "}{ self.average }</p>
+                <p>{ self.trend.clone() }</p>
             </div>
         }
+    }
+}
+
+impl Model {
+    fn update_data(&mut self, new_value: f64) {
+
+        let average =self.temperature_values.add(new_value).clone();
+
+            self.trend = if  average > self.average {
+             String::from("Warming up")
+        } else {
+            String::from("cooling down")
+        };
+
+        self.average = average;
     }
 }
 
