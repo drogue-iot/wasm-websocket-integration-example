@@ -1,15 +1,12 @@
-use num_traits::{Num, FromPrimitive};
+use num_traits::{FromPrimitive, Num};
 
 pub struct MovingAverage<T> {
     values: Vec<T>,
     position: usize,
 }
 
-
 impl<T: FromPrimitive + Copy + Num> MovingAverage<T> {
-
-    pub fn new (size: usize) -> Self {
-
+    pub fn new(size: usize) -> Self {
         MovingAverage {
             values: Vec::with_capacity(size),
             position: 0,
@@ -17,9 +14,8 @@ impl<T: FromPrimitive + Copy + Num> MovingAverage<T> {
     }
 
     pub fn add(&mut self, new_val: T) -> T {
-
         self.values.insert(self.position, new_val);
-        self.position = ( self.position + 1) % self.values.len();
+        self.position = (self.position + 1) % self.values.len();
 
         self.average()
     }
@@ -33,7 +29,7 @@ impl<T: FromPrimitive + Copy + Num> MovingAverage<T> {
     }
 
     fn average(&self) -> T {
-
-        self.values.iter().fold(T::zero(), |sum,  &x| sum + x ) / T::from_usize(self.values.len()).unwrap()
+        self.values.iter().fold(T::zero(), |sum, &x| sum + x)
+            / T::from_usize(self.values.len()).unwrap()
     }
 }
