@@ -108,12 +108,10 @@ impl Component for Model {
                                         .unwrap();
 
                                     let series: LineSeries<_, _> = LineSeries::new(
-                                        (0..).zip(self.temperature_dataset.iter()).map(
-                                            |(idx, (date, temp))| {
-                                                let date: DateTime<Utc> = Utc.timestamp(*date, 0);
-                                                (date, *temp)
-                                            },
-                                        ),
+                                        self.temperature_dataset.iter().map(|((date, temp))| {
+                                            let date: DateTime<Utc> = Utc.timestamp(*date, 0);
+                                            (date, *temp)
+                                        }),
                                         &RED,
                                     );
 
