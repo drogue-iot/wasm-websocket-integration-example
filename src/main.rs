@@ -155,13 +155,11 @@ impl Component for Model {
 
                     let backend = CanvasBackend::new("temperature").expect("cannot find canvas");
                     let root = backend.into_drawing_area();
-                    let font: FontDesc = ("sans-serif", 16.0).into();
 
                     root.fill(&WHITE).unwrap();
 
                     let mut chart = ChartBuilder::on(&root)
-                        .margin(20)
-                        .caption("Temperature", ("sans-serif", 40))
+                        .caption("Temperature", ("sans-serif", 32))
                         .set_label_area_size(LabelAreaPosition::Left, 40)
                         .set_label_area_size(LabelAreaPosition::Bottom, 40)
                         .build_cartesian_2d(start_date..end_date, -20.0..40.0)
@@ -169,8 +167,8 @@ impl Component for Model {
 
                     chart
                         .configure_mesh()
-                        .x_labels(5)
-                        .y_labels(5)
+                        .x_labels(6)
+                        .y_labels(6)
                         .draw()
                         .unwrap();
 
@@ -198,7 +196,7 @@ impl Component for Model {
                     chart
                         .configure_series_labels()
                         .border_style(&BLACK)
-                        .background_style(&WHITE.mix(0.8))
+                        .background_style(&WHITE.mix(0.5))
                         .draw()
                         .unwrap();
                     root.present().unwrap();
