@@ -17,6 +17,3 @@ serde_json = "1.0.66"
 plotters = {version = "0.3", features = ["line_series", "datetime"] }
 plotters-canvas = "0.3"
 chrono = "0.4"
-
-[patch.crates-io]
-plotters = { git = "https://github.com/lulf/plotters", branch = "master" }

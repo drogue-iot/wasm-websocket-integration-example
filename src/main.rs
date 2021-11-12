@@ -1,7 +1,7 @@
 mod moving_avg;
 
 use anyhow::Error;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use serde_json::Value;
@@ -24,7 +24,7 @@ struct Model {
     // It can be used to send messages to the component
     link: ComponentLink<Self>,
     socket: Option<WebSocketTask>,
-    temperature_dataset: HashMap<String, (usize, VecDeque<(i64, f64)>)>,
+    temperature_dataset: HashMap<String, (usize, VecDeque<(DateTime<FixedOffset>, f64)>)>,
     state: String,
     url: String,
 }
@@ -87,7 +87,7 @@ impl Component for Model {
                                                 if dataset.len() >= CAPACITY {
                                                     dataset.pop_front();
                                                 }
-                                                dataset.push_back((r.timestamp(), temp));
+                                                dataset.push_back((r, temp));
                                             });
                                         }
                                         Value::String(s) => {
@@ -96,7 +96,7 @@ impl Component for Model {
                                                 if dataset.len() >= CAPACITY {
                                                     dataset.pop_front();
                                                 }
-                                                dataset.push_back((r.timestamp(), temp));
+                                                dataset.push_back((r, temp));
                                             }
                                         }
                                         _ => {}
@@ -129,20 +129,24 @@ impl Component for Model {
                 true
             }
             Msg::UpdateGraph => {
-                let mut first: Option<i64> = None;
-                let mut last: Option<i64> = None;
+                let mut first: Option<DateTime<FixedOffset>> = None;
+                let mut last: Option<DateTime<FixedOffset>> = None;
 
                 // Find the first and last datapoints in dataset
                 for (_, (_, dataset)) in &self.temperature_dataset {
                     if !dataset.is_empty() {
                         if let Some(f) = first {
-                            first.replace(core::cmp::min(dataset[0].0, f));
+                            if dataset[0].0 < f {
+                                first.replace(dataset[0].0);
+                            }
                         } else {
                             first.replace(dataset[0].0);
                         }
 
                         if let Some(l) = last {
-                            last.replace(core::cmp::min(dataset[dataset.len() - 1].0, l));
+                            if dataset[dataset.len() - 1].0 > l {
+                                last.replace(dataset[dataset.len() - 1].0);
+                            }
                         } else {
                             last.replace(dataset[dataset.len() - 1].0);
                         }
@@ -150,8 +154,8 @@ impl Component for Model {
                 }
 
                 if first.is_some() && last.is_some() {
-                    let start_date = Utc.timestamp(first.unwrap(), 0);
-                    let end_date = Utc.timestamp(last.unwrap(), 0);
+                    let start_date = first.unwrap();
+                    let end_date = last.unwrap();
 
                     let backend = CanvasBackend::new("temperature").expect("cannot find canvas");
                     let root = backend.into_drawing_area();
@@ -162,12 +166,12 @@ impl Component for Model {
                         .caption("Temperature", ("sans-serif", 32))
                         .set_label_area_size(LabelAreaPosition::Left, 40)
                         .set_label_area_size(LabelAreaPosition::Bottom, 40)
-                        .build_cartesian_2d(start_date..end_date, -20.0..40.0)
+                        .build_cartesian_2d(start_date..end_date, -10.0..40.0)
                         .unwrap();
 
                     chart
                         .configure_mesh()
-                        .x_labels(6)
+                        .x_labels(4)
                         .y_labels(6)
                         .draw()
                         .unwrap();
@@ -176,11 +180,12 @@ impl Component for Model {
                         if !dataset.is_empty() {
                             let series: LineSeries<_, _> = LineSeries::new(
                                 dataset.iter().map(|(date, temp)| {
-                                    let date: DateTime<Utc> = Utc.timestamp(*date, 0);
+                                    let date: DateTime<_> = *date;
                                     (date, *temp)
                                 }),
                                 COLORS[*color],
-                            );
+                            )
+                            .point_size(4);
                             ConsoleService::log(&format!(
                                 "Drawing line graph for device '{}'",
                                 device
@@ -195,6 +200,7 @@ impl Component for Model {
                     }
                     chart
                         .configure_series_labels()
+                        .position(SeriesLabelPosition::UpperRight)
                         .border_style(&BLACK)
                         .background_style(&WHITE.mix(0.5))
                         .draw()
