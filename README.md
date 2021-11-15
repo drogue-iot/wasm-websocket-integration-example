@@ -23,5 +23,8 @@ trunk serve --port 8000
 
 ```
 trunk build -d docs --public-url /wasm-websocket-integration-example
+git add docs
+git commit -m 'Update GH pages'
+git push
 ```
 
