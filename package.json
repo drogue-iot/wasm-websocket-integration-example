@@ -1,0 +1,8 @@
+{
+  "name": "patternfly-yew",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@patternfly/patternfly": "^4.102.2"
+  }
+}

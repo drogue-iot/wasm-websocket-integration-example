@@ -1,5 +1,9 @@
 use anyhow::Error;
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Timelike};
+use patternfly_yew::{
+    Bullseye, Button, Content, EmptyState, Icon, PageSection, PageSectionVariant, Size, TextInput,
+    Title, Toolbar, ToolbarElementModifier, ToolbarGroup, ToolbarItem, Variant, WithBreakpointExt,
+};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use serde_json::Value;
@@ -12,10 +16,16 @@ use yew::services::{
 
 pub enum Msg {
     Connect,
+    Disconnect,
     UpdateUrl(String),
     UpdateGraph,
     Data(Result<String, Error>),
     Ignore,
+}
+
+#[derive(Clone, Debug, Properties, PartialEq)]
+pub struct Props {
+    pub url: String,
 }
 
 pub struct Chart {
@@ -23,8 +33,16 @@ pub struct Chart {
     link: ComponentLink<Self>,
     socket: Option<WebSocketTask>,
     temperature_dataset: HashMap<String, (usize, VecDeque<(DateTime<FixedOffset>, f64)>)>,
-    state: String,
-    url: String,
+    state: State,
+    props: Props,
+    total_received: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum State {
+    Disconnected,
+    Connecting,
+    Connected,
 }
 
 const SCHEMA: &str = "urn:drogue:iot:temperature";
@@ -32,15 +50,17 @@ const CAPACITY: usize = 100;
 
 impl Component for Chart {
     type Message = Msg;
-    type Properties = ();
+    type Properties = Props;
 
-    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
+    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         Self {
             link,
             socket: None,
             temperature_dataset: HashMap::new(),
-            state: String::from("No Connected"),
-            url: "wss://ws-integration.sandbox.drogue.cloud/drogue-public-temperature".to_string(),
+            state: State::Disconnected,
+            props,
+            total_received: 0,
+            //url: "wss://ws-integration.sandbox.drogue.cloud/drogue-public-temperature".to_string(),
         }
     }
 
@@ -48,11 +68,10 @@ impl Component for Chart {
         match msg {
             Msg::Ignore => false,
             Msg::UpdateUrl(url) => {
-                self.url = url;
+                self.props.url = url;
                 true
             }
             Msg::Data(data) => {
-                self.state = String::from("Receiving data");
                 match data {
                     Ok(s) => {
                         ConsoleService::log("Data updated");
@@ -60,9 +79,10 @@ impl Component for Chart {
 
                         ConsoleService::log(&format!("Received: {:?}", &json));
                         if let Some(SCHEMA) = json["dataschema"].as_str() {
+                            self.total_received += 1;
                             json["time"].as_str().map(|time| {
                                 ConsoleService::log(&format!("Time: {:?}", time));
-                                DateTime::parse_from_rfc3339(&time).map(|r| {
+                                let _ = DateTime::parse_from_rfc3339(&time).map(|r| {
                                     ConsoleService::log(&format!(
                                         "Successfully parsed, timestamp: {}",
                                         r.timestamp()
@@ -72,7 +92,8 @@ impl Component for Chart {
                                             if self.temperature_dataset.contains_key(device) {
                                                 self.temperature_dataset.get_mut(device).unwrap()
                                             } else {
-                                                let color = pick_random_color();
+                                                let color =
+                                                    self.temperature_dataset.len() % COLORS.len();
                                                 self.temperature_dataset.insert(
                                                     device.to_string(),
                                                     (color, VecDeque::with_capacity(CAPACITY)),
@@ -112,10 +133,16 @@ impl Component for Chart {
                 }
                 true
             }
+            Msg::Disconnect => {
+                self.socket.take();
+                self.state = State::Disconnected;
+                true
+            }
             Msg::Connect => {
-                self.state = String::from("Connecting");
+                self.total_received = 0;
+                self.temperature_dataset.clear();
+                self.state = State::Connecting;
                 let on_data = self.link.callback(|data| Msg::Data(data));
-                let c = self.link.clone();
                 let on_notify = self.link.callback(move |input| {
                     ConsoleService::log(&format!("Notification: {:?}", input));
                     match input {
@@ -124,10 +151,10 @@ impl Component for Chart {
                     }
                 });
                 if self.socket.is_none() {
-                    let task = WebSocketService::connect_text(&self.url, on_data, on_notify);
+                    let task = WebSocketService::connect_text(&self.props.url, on_data, on_notify);
                     ConsoleService::log("Task created");
                     self.socket.replace(task.unwrap());
-                    self.state = String::from("Connected, waiting for data...");
+                    self.state = State::Connected;
                 }
                 true
             }
@@ -166,16 +193,22 @@ impl Component for Chart {
                     root.fill(&WHITE).unwrap();
 
                     let mut chart = ChartBuilder::on(&root)
-                        .caption("Temperature", ("sans-serif", 32))
-                        .set_label_area_size(LabelAreaPosition::Left, 40)
+                        //.caption("Temperature", ("sans-serif", 32))
+                        .margin(5)
+                        .set_label_area_size(LabelAreaPosition::Left, 60)
                         .set_label_area_size(LabelAreaPosition::Bottom, 40)
                         .build_cartesian_2d(start_date..end_date, -10.0..40.0)
                         .unwrap();
 
                     chart
                         .configure_mesh()
-                        .x_labels(4)
-                        .y_labels(6)
+                        .disable_x_mesh()
+                        .x_labels(8)
+                        .y_desc("Temperature (℃)")
+                        .x_desc("Time")
+                        .x_label_formatter(&|x| {
+                            format!("{:02}:{:02}:{:02}", x.hour(), x.minute(), x.second())
+                        })
                         .draw()
                         .unwrap();
 
@@ -226,28 +259,100 @@ impl Component for Chart {
 
     fn view(&self) -> Html {
         html! {
-            <div>
-                <div>
-                    <input placeholder="Url" value=self.url.clone() size="100" oninput=self.link.callback(|e: InputData| Msg::UpdateUrl(e.value)) />
-                    <br />
-                    <button onclick=self.link.callback(|_| Msg::Connect)>{ "Connect" }</button>
-                </div>
-                <p>{ self.state.clone() }</p>
-                <div class="temperature">
-                    <canvas id="temperature" height = "400px" width="1024px" />
-                </div>
-            </div>
+            <>
+            <PageSection variant=PageSectionVariant::Light limit_width=true>
+                <Content>
+                    <Title>{"Temperature Monitor"}</Title>
+                </Content>
+            </PageSection>
+            <PageSection>
+           <Toolbar>
+               <ToolbarGroup>
+
+                   { if self.state == State::Disconnected { html!{
+                   <ToolbarItem>
+                       <TextInput
+                           value=self.props.url.clone(),
+                           onchange=self.link.callback(|url|Msg::UpdateUrl(url))
+                           required=true,
+                           r#type="url".to_string(),
+                           placeholder="Websocket URL to consume events from"/>
+                   </ToolbarItem>
+                   }} else { html!{} }}
+
+                   <ToolbarItem>
+                       {if self.state != State::Disconnected {
+                           html!{<Button
+                                   label="Disconnected"
+                                   icon=Icon::Pause
+                                   variant=Variant::Secondary
+                                   onclick=self.link.callback(|_|Msg::Disconnect)
+                           />}
+                       } else {
+                           html!{<Button
+                                   label="Connect"
+                                   icon=Icon::Play
+                                   variant=Variant::Primary
+                                   onclick=self.link.callback(|_|Msg::Connect)
+                           />}
+                       }}
+                   </ToolbarItem>
+               </ToolbarGroup>
+               <ToolbarItem modifiers=vec![ToolbarElementModifier::Left.all()]>
+                   {
+                       html!{
+                           <strong>{"State: "}{format!("{:?}", self.state)}</strong>
+                       }
+                   }
+               </ToolbarItem>
+               <ToolbarItem modifiers=vec![ToolbarElementModifier::Right.all()]>
+                   {
+                       html!{
+                           <strong>{"Events received: "}{self.total_received}</strong>
+                       }
+                   }
+               </ToolbarItem>
+           </Toolbar>
+            </PageSection>
+            <PageSection>
+               { if self.temperature_dataset.is_empty() {
+                   html! {
+                       <div style="width: 100%; height: 100%;">
+                           {self.render_empty() }
+                           <canvas id="temperature" width="1024px" height="768px" />
+                       </div>
+                   }
+               } else {
+                   html! {
+                       <div style="width: 100%; height: 100%;">
+                           <canvas id="temperature" width="1024px" height="768px" />
+                       </div>
+                   }
+               }
+               }
+            </PageSection>
+            </>
         }
     }
 }
 
-const COLORS: [RGBColor; 7] = [BLACK, BLUE, CYAN, GREEN, MAGENTA, RED, YELLOW];
-
-fn pick_random_color() -> usize {
-    use rand::RngCore;
-    let mut rng = rand::rngs::OsRng;
-    let mut b: [u8; 1] = [0];
-    rng.fill_bytes(&mut b);
-    let num: usize = b[0] as usize % COLORS.len();
-    num
+impl Chart {
+    fn render_empty(&self) -> Html {
+        return html! {
+            <div style="padding-bottom: 10rem; height: 100%;">
+            <Bullseye>
+            <EmptyState
+                title="No events"
+                icon=Icon::Pending
+                size=Size::XLarge
+                >
+                { "The " } <q> {"graph "} </q> { " will only draw when messages are received.
+                When the messages arrive, you will see it right here." }
+            </EmptyState>
+            </Bullseye>
+            </div>
+        };
+    }
 }
+
+const COLORS: [RGBColor; 7] = [BLACK, BLUE, CYAN, GREEN, MAGENTA, RED, YELLOW];

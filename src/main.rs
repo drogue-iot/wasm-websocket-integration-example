@@ -1,21 +1,10 @@
-use anyhow::Error;
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+#![recursion_limit = "512"]
 use patternfly_yew::*;
-use plotters::prelude::*;
-use plotters_canvas::CanvasBackend;
-use serde_json::Value;
-use std::collections::{HashMap, VecDeque};
 use yew::prelude::*;
-use yew::services::{
-    websocket::{WebSocketService, WebSocketStatus, WebSocketTask},
-    ConsoleService,
-};
 use yew_router::prelude::*;
 
 mod chart;
 use chart::*;
-mod index;
-use index::*;
 
 struct Model {}
 
@@ -23,19 +12,17 @@ struct Model {}
 pub enum AppRoute {
     #[to = "/temperature"]
     Temperature,
-    #[to = "/"]
-    Index,
 }
 
 impl Component for Model {
     type Message = ();
     type Properties = ();
 
-    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
+    fn create(_props: Self::Properties, _link: ComponentLink<Self>) -> Self {
         Self {}
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, _: Self::Message) -> ShouldRender {
         true
     }
 
@@ -53,11 +40,10 @@ impl Component for Model {
             <ToastViewer/>
 
             <Router<AppRoute, ()>
-                redirect = Router::redirect(|_|AppRoute::Index)
+                redirect = Router::redirect(|_|AppRoute::Temperature)
                 render = Router::render(|switch: AppRoute| {
                     match switch {
-                        AppRoute::Temperature  => Self::page(html!{<Chart/>}),
-                        AppRoute::Index => Self::page(html!{<Index/>}),
+                        AppRoute::Temperature  => Self::page(html!{<Chart url = "wss://ws-integration.sandbox.drogue.cloud/drogue-public-temperature" />}),
                     }
                 })
              />
@@ -72,9 +58,7 @@ impl Model {
             <PageSidebar>
                 <Nav>
                     <NavRouterExpandable<AppRoute> title="Websocket Integration">
-                        <NavRouterItem<AppRoute> to=AppRoute::Index>{"Index"}</NavRouterItem<AppRoute>>
                         <NavRouterItem<AppRoute> to=AppRoute::Temperature>{"Temperature"}</NavRouterItem<AppRoute>>
-                        <NavItem external=true to="https://github.com/ctron/patternfly-yew">{"PatternFly Yew"}</NavItem>
                     </NavRouterExpandable<AppRoute>>
                 </Nav>
             </PageSidebar>
@@ -83,7 +67,7 @@ impl Model {
         html! {
             <Page
                 logo={html_nested!{
-                    <Logo src="https://www.patternfly.org/assets/images/PF-Masthead-Logo.svg" alt="Patternfly Logo" />
+                    <Logo src="/logo.png" alt="Drogue IoT Logo" />
                 }}
                 sidebar=sidebar
                 >

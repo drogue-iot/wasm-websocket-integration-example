@@ -1,17 +1,20 @@
-# *WIP* wasm-websocket-integration-example
+# wasm-websocket-integration-example
 
 ## Prerequisites
 
+* Cargo
+* Npm
+
+## Build dependencies
+
 ```
-cargo install trunk wasm-bindgen-cli
+cargo install trunk
 rustup target add wasm32-unknown-unknown
 ```
-### Websocket server
-
-Use drogue sandbox or follow https://quarkus.io/guides/websockets to run a basic server and chat with this web app
 
 ## Running
 
 ```
+npm install
 trunk serve --port 8000
 ```
