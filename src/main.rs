@@ -10,7 +10,7 @@ struct Model {}
 
 #[derive(Switch, Debug, Clone, PartialEq)]
 pub enum AppRoute {
-    #[to = "/temperature"]
+    #[to = "temperature"]
     Temperature,
 }
 
@@ -67,7 +67,7 @@ impl Model {
         html! {
             <Page
                 logo={html_nested!{
-                    <Logo src="/logo.png" alt="Drogue IoT Logo" />
+                    <Logo src="logo.png" alt="Drogue IoT Logo" />
                 }}
                 sidebar=sidebar
                 >
