@@ -6,11 +6,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yew = "0.18"
+yew = "0.17"
 patternfly-yew = "0.0.26"
 web-sys = "0.3.52"
 anyhow = "1.0"
 rand = "0.8"
+yew-router = "0.14"
 
 num-traits = "0.2"
 serde_json = "1.0.66"
