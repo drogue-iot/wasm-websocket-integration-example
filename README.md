@@ -18,3 +18,10 @@ rustup target add wasm32-unknown-unknown
 npm install
 trunk serve --port 8000
 ```
+
+## Updating github pages
+
+```
+trunk build -d docs --public-url /wasm-websocket-integration-example
+```
+
