@@ -10,7 +10,7 @@ struct Model {}
 
 #[derive(Switch, Debug, Clone, PartialEq)]
 pub enum AppRoute {
-    #[to = "temperature"]
+    #[to = "/"]
     Temperature,
 }
 
